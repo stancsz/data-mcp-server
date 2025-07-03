@@ -312,6 +312,7 @@ class Task:
             self.status_message = (
                 f"Agentic loop exited after reaching max_loops={self.max_loops} without explicit completion."
             )
+            self._reflect_and_log()
             self.finished = True
 
     def _add_message(self, role, content):
@@ -322,6 +323,91 @@ class Task:
         import re
         match = re.search(f"<{tag}>(.*?)</{tag}>", xml, re.DOTALL)
         return match.group(1).strip() if match else ""
+
+    def _reflect_and_log(self):
+        """
+        Reflection mechanism: log thoughts, loop, and possible cause when max_loops is reached.
+        Generates a JSON file and (optionally) sends it to the agent's 'brain'.
+        """
+        import json
+        import datetime
+        import re
+
+        # Brief error message for filename
+        brief_error = re.sub(r'[^a-zA-Z0-9_ -]', '', self.status_message)[:40].replace(' ', '_')
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"reflection log - {brief_error}_{timestamp}.json"
+
+        # Gather thoughts (all conversation history)
+        thoughts = self.conversation
+
+        # Reflection: simple heuristic for now
+        possible_cause = "The agent reached the maximum number of loops without completing the task. This may be due to ambiguous instructions, insufficient tool use, or a bug in the code editing logic."
+
+        reflection_log = {
+            "timestamp": timestamp,
+            "user_instruction": self.user_instruction,
+            "file_path": self.file_path,
+            "plan": self.plan,
+            "loop_count": self.loop_count,
+            "max_loops": self.max_loops,
+            "status_message": self.status_message,
+            "thoughts": thoughts,
+            "possible_cause": possible_cause,
+        }
+
+        # Write JSON file
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(reflection_log, f, indent=2)
+
+        # Check for self-learning integration
+        self_learning_url = os.environ.get("AGENT_SELF_LEARNING_URL")
+        if self_learning_url:
+            try:
+                import requests
+                resp = requests.post(self_learning_url, json=reflection_log, timeout=10)
+                print(f"Reflection log sent to self-learning endpoint: {resp.status_code}")
+            except Exception as e:
+                print(f"Failed to send reflection log to self-learning endpoint: {e}")
+
+        # Self-editing: Analyze repo for insufficient code and self-edit, then send diff to self-learning endpoint
+        # Only proceed if self_learning_url is set
+        if self_learning_url:
+            python_files = [
+                "example.py",
+                "coding_agent/__init__.py",
+                "coding_agent/agent.py",
+                "coding_agent/mcp.py",
+                "coding_agent/utils.py",
+                "tests/test_agent.py"
+            ]
+            diffs = []
+            for file_path in python_files:
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        before = f.read()
+                    # Placeholder: Use LLM to suggest edit based on reflection_log and file content
+                    # For now, just pass through the original content (no edit)
+                    after = before
+                    # TODO: Integrate LLM call here to suggest improvements
+                    if after != before:
+                        with open(file_path, "w", encoding="utf-8") as f:
+                            f.write(after)
+                        # Use file_diff utility if available
+                        try:
+                            diff = file_diff(before, after, file_path)
+                        except Exception:
+                            diff = f"Diff for {file_path} not available."
+                        diffs.append({"file": file_path, "diff": diff})
+                except Exception as e:
+                    diffs.append({"file": file_path, "error": str(e)})
+            # Send diffs to self-learning endpoint if any changes were made
+            if diffs:
+                try:
+                    resp = requests.post(self_learning_url, json={"self_edit_diffs": diffs}, timeout=10)
+                    print(f"Self-edit diffs sent to self-learning endpoint: {resp.status_code}")
+                except Exception as e:
+                    print(f"Failed to send self-edit diffs to self-learning endpoint: {e}")
 
     def get_summary(self):
         summary = "Step-by-step plan:\n"
