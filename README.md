@@ -24,11 +24,52 @@ mini is designed to be a minimal, maintainable, and extensible Python agent that
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/mini.git
+git clone https://github.com/stancsz/mini.git
 cd mini
 ```
 
 (If dependencies are required, add them to a `requirements.txt` and install with `pip install -r requirements.txt`.)
+
+## Prompt Flow Overview
+
+```mermaid
+flowchart TD
+    A[User Instruction] --> B[Agent: Planning Phase]
+    B --> C[LLM: Generate Step-by-Step Plan]
+    C --> D[Agent: Execution Phase]
+    D --> E[LLM: Edit Code File(s)]
+    E --> F[Write Changes to Files]
+    F --> G{Task Complete?}
+    G -- Yes --> H[Done]
+    G -- No (Max Loops) --> I[Agent: Reflection Log]
+    I --> J[Self-Learning API]
+    J --> K[Agent: Self-Edit Source Code]
+    K --> F
+```
+
+- The agent receives a user instruction and plans the steps with the LLM.
+- It executes the plan, asking the LLM to edit code.
+- If the task is not completed after several loops, it generates a reflection log.
+- The reflection log is sent to the self-learning API, which can trigger the agent to self-edit its own codebase, closing the feedback loop.
+
+## Self-Evolving Mechanism
+
+```mermaid
+flowchart TD
+    A[Agent Hits Max Loops or Fails Task] --> B[Generate Reflection Log]
+    B --> C[Send Log to Self-Learning API]
+    C --> D[Agent Analyzes Log & Codebase]
+    D --> E[LLM Proposes Self-Edits]
+    E --> F[Apply Edits to Agent Source Code]
+    F --> G[Commit & Push Changes]
+    G --> H[Agent Ready for New Tasks]
+```
+
+- When the agent cannot complete a task, it generates a reflection log.
+- The log is sent to the self-learning API endpoint.
+- The agent uses the LLM to analyze the log and its own codebase, proposing and applying self-improvements.
+- Changes are committed and pushed to version control.
+- The improved agent is ready to handle new tasks, enabling continuous self-evolution.
 
 ## Usage
 
