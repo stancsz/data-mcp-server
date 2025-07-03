@@ -3,6 +3,9 @@ import shutil
 import tempfile
 import pytest
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from coding_agent.agent import run_coding_agent
 
 def create_sample_file(dir_path, filename, content):

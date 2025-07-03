@@ -86,7 +86,7 @@ def run_coding_agent(prompt, code_dir, pr_title, pr_body, pr_branch, commit_and_
             store=True
         )
         # Extract new content from LLM response
-        after = response.text if hasattr(response, "text") else ""
+        after = getattr(response, "output_text", "")
         if after and after.strip() != before.strip():
             write_file(file_path, after)
             diff = file_diff(before, after, file_path)
