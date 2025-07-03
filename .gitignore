@@ -106,7 +106,6 @@ cython_debug/
 # Environment variables
 .env
 
-
 # MacOS
 .DS_Store
 
@@ -117,3 +116,4 @@ Desktop.ini
 
 # Test output
 test-output/
+docs/notes
