@@ -1,0 +1,35 @@
+# Example MCP server configuration for coding_agent
+servers:
+  - name: example-mcp-server
+    endpoint: http://localhost:5001
+    tools:
+      - name: get_weather
+        description: Get the weather for a city.
+        parameters:
+          - name: city
+            type: string
+            required: true
+      - name: summarize_text
+        description: Summarize a block of text.
+        parameters:
+          - name: text
+            type: string
+            required: true
+    resources:
+      - name: weather_data
+        description: Provides raw weather data for analysis.
+  - name: github-mcp
+    endpoint: http://localhost:5002
+    tools:
+      - name: create_issue
+        description: Create a GitHub issue.
+        parameters:
+          - name: repo
+            type: string
+            required: true
+          - name: title
+            type: string
+            required: true
+          - name: body
+            type: string
+            required: false
