@@ -4,132 +4,112 @@ Agent for autonomous code editing using OpenAI LLM.
 Usage:
     from coding_agent.agent import run_coding_agent
 
-    run_coding_agent(
-        prompt="Refactor all functions to use async/await.",
-        code_dir="/path/to/project",
-        pr_title="Refactor to async/await",
-        pr_body="This PR refactors all functions to use async/await syntax.",
-        pr_branch="refactor-async-await"
+    response_message, modified_files = run_coding_agent(
+        prompt="Refactor this function to use async/await.",
+        file_path="/path/to/file.py"
     )
+    print(response_message)
+    # modified_files is a list of file paths that were changed
 """
 
-import os
 from openai import OpenAI
-from .utils import read_file, write_file, file_diff, write_pr_yaml, write_git_sh
+from .utils import read_file, write_file, file_diff
 
-import subprocess
-import random
-from datetime import datetime, timedelta
-
-def run_coding_agent(prompt, code_dir, pr_title, pr_body, pr_branch, commit_and_push=False):
+def run_coding_agent(prompt, file_path):
     """
     Main entrypoint for the coding agent.
 
     Args:
         prompt (str): User instruction for code changes.
-        code_dir (str): Path to the codebase to edit.
-        pr_title (str): Title for the pull request.
-        pr_body (str): Body/description for the pull request.
-        pr_branch (str): Target branch name for the PR.
+        file_path (str): Path to the code file to edit.
 
-    Outputs:
-        - pr.yaml: PR metadata for GitHub CLI
-        - git.sh: POSIX shell script for git operations
+    Returns:
+        response_message (str): The plan and summary of changes.
+        modified_files (list): List of file paths that were changed.
     """
-    # 1. Gather code context
-    code_files = []
-    for root, _, files in os.walk(code_dir):
-        for f in files:
-            if f.endswith(('.py', '.js', '.ts', '.json', '.md', '.txt', '.yaml', '.yml')):
-                code_files.append(os.path.join(root, f))
-
     client = OpenAI()
-    diffs = []
-    changed_files = []
-    commit_steps = []
+    modified_files = []
 
-    # 2. For each file, use LLM to suggest edits
-    for file_path in code_files:
-        before = read_file(file_path)
-        # Construct LLM input: prompt, file path, file content
-        llm_input = [
-            {
-                "role": "system",
-                "content": (
-                    "You are an autonomous coding agent. "
-                    "Given a user instruction and a code file, output the revised file content only. "
-                    "Do not include explanations or comments outside the code."
-                )
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"User instruction: {prompt}\n"
-                    f"File path: {file_path}\n"
-                    f"File content:\n{before}"
-                )
-            }
-        ]
-        response = client.responses.create(
-            model="gpt-4.1",
-            input=llm_input,
-            text={
-                "format": {
-                    "type": "text"
-                }
-            },
-            reasoning={},
-            tools=[],
-            temperature=1,
-            max_output_tokens=2048,
-            top_p=1,
-            store=True
-        )
-        # Extract new content from LLM response
-        after = getattr(response, "output_text", "")
-        if after and after.strip() != before.strip():
-            write_file(file_path, after)
-            diff = file_diff(before, after, file_path)
-            diffs.append(diff)
-            changed_files.append(file_path)
-            commit_steps.append({
-                "file": file_path,
-                "msg": f"Edit {os.path.relpath(file_path, code_dir)} as per instruction"
-            })
+    # 1. Planning phase: ask LLM for a step-by-step plan
+    planning_input = [
+        {
+            "role": "system",
+            "content": (
+                "You are an expert software engineer AI. "
+                "Given a user instruction and a code file, your first task is to create a clear, step-by-step plan for how you would accomplish the requested change. "
+                "Do not write any code yet. Just output the plan as a numbered list."
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                f"User instruction: {prompt}\n"
+                f"File path: {file_path}\n"
+                f"File content:\n{read_file(file_path)}"
+            )
+        }
+    ]
+    plan_response = client.responses.create(
+        model="gpt-4.1",
+        input=planning_input,
+        text={"format": {"type": "text"}},
+        reasoning={},
+        tools=[],
+        temperature=0.5,
+        max_output_tokens=512,
+        top_p=1,
+        store=True
+    )
+    plan = getattr(plan_response, "output_text", "").strip()
 
-    # 3. Summarize changes for PR body
-    changes_summary = ""
-    if changed_files:
-        changes_summary = "Files changed:\n" + "\n".join(f"- {os.path.relpath(f, code_dir)}" for f in changed_files)
-        if diffs:
-            changes_summary += "\n\nDiff summary:\n" + "\n".join(diffs[:3])  # Show up to 3 diffs
+    # 2. Execution phase: ask LLM to edit the file according to the plan
+    before = read_file(file_path)
+    execution_input = [
+        {
+            "role": "system",
+            "content": (
+                "You are an autonomous coding agent. "
+                "Given a user instruction, a step-by-step plan, and a code file, output the revised file content only. "
+                "Do not include explanations or comments outside the code."
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                f"User instruction: {prompt}\n"
+                f"Step-by-step plan:\n{plan}\n"
+                f"File path: {file_path}\n"
+                f"File content:\n{before}"
+            )
+        }
+    ]
+    exec_response = client.responses.create(
+        model="gpt-4.1",
+        input=execution_input,
+        text={"format": {"type": "text"}},
+        reasoning={},
+        tools=[],
+        temperature=0.7,
+        max_output_tokens=2048,
+        top_p=1,
+        store=True
+    )
+    after = getattr(exec_response, "output_text", "").strip()
 
-    # 4. Output pr.yaml and git.sh
-    pr_yaml_path = os.path.join(code_dir, "pr.yaml")
-    git_sh_path = os.path.join(code_dir, "git.sh")
-    full_pr_body = pr_body
-    if changes_summary:
-        full_pr_body += "\n\n" + changes_summary
+    # 3. Write the new file if changed
+    if after and after != before:
+        write_file(file_path, after)
+        modified_files.append(file_path)
+        diff = file_diff(before, after, file_path)
+    else:
+        diff = "No changes made."
 
-    write_pr_yaml(pr_yaml_path, pr_title, full_pr_body, pr_branch)
-    write_git_sh(git_sh_path, pr_branch, commit_steps)
+    # 4. Compose response message
+    response_message = (
+        "Step-by-step plan:\n"
+        f"{plan}\n\n"
+        "Summary of changes:\n"
+        f"{diff}"
+    )
 
-    if commit_and_push and commit_steps:
-        # Perform git operations directly
-        cwd = os.path.abspath(code_dir)
-        # Create branch
-        subprocess.run(["git", "checkout", "-b", pr_branch], cwd=cwd, check=True)
-        base_time = datetime.now()
-        for step in commit_steps:
-            offset = random.randint(10, 20)
-            base_time += timedelta(minutes=offset)
-            ts = base_time.strftime("%Y-%m-%dT%H:%M:%S")
-            env = os.environ.copy()
-            env["GIT_COMMITTER_DATE"] = ts
-            env["GIT_AUTHOR_DATE"] = ts
-            subprocess.run(["git", "add", step["file"]], cwd=cwd, check=True, env=env)
-            subprocess.run(["git", "commit", "-m", step["msg"]], cwd=cwd, check=True, env=env)
-        subprocess.run(["git", "push", "origin", pr_branch], cwd=cwd, check=True)
-        print(f"Committed and pushed {len(commit_steps)} changes to branch {pr_branch}.")
-
-    print(f"Agent run complete. {len(changed_files)} files changed. pr.yaml and git.sh written to {code_dir}.")
+    return response_message, modified_files

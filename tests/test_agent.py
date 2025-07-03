@@ -1,5 +1,4 @@
 import os
-import shutil
 import tempfile
 import pytest
 
@@ -15,27 +14,22 @@ def create_sample_file(dir_path, filename, content):
     return file_path
 
 @pytest.fixture
-def temp_code_dir():
+def temp_code_file():
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create a sample Python file
-        create_sample_file(tmpdir, "foo.py", "def foo():\n    return 1\n")
-        yield tmpdir  # Provide the temp directory to the test
+        file_path = create_sample_file(tmpdir, "foo.py", "def foo():\n    return 1\n")
+        yield file_path  # Provide the temp file path to the test
 
-def test_run_coding_agent_basic(temp_code_dir):
+def test_run_coding_agent_basic(temp_code_file):
     # Run the agent with a simple prompt
-    run_coding_agent(
+    response_message, modified_files = run_coding_agent(
         prompt="Rename function foo to bar.",
-        code_dir=temp_code_dir,
-        pr_title="Rename foo to bar",
-        pr_body="Renames foo to bar.",
-        pr_branch="test-branch",
-        commit_and_push=False
+        file_path=temp_code_file
     )
-    # Check that pr.yaml and git.sh were created
-    assert os.path.exists(os.path.join(temp_code_dir, "pr.yaml"))
-    assert os.path.exists(os.path.join(temp_code_dir, "git.sh"))
     # Check that the file was edited (if LLM is mocked or API key is set)
-    with open(os.path.join(temp_code_dir, "foo.py"), encoding="utf-8") as f:
+    with open(temp_code_file, encoding="utf-8") as f:
         content = f.read()
-    # The actual content check depends on LLM response; here we just check file exists
+    # The actual content check depends on LLM response; here we just check file exists and was changed
     assert "def" in content
+    assert temp_code_file in modified_files
+    assert "Step-by-step plan" in response_message
+    assert "Summary of changes" in response_message
