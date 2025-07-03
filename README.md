@@ -34,16 +34,16 @@ cd mini
 
 ```mermaid
 flowchart TD
-    A[User Instruction] --> B[Agent: Planning Phase]
-    B --> C[LLM: Generate Step-by-Step Plan]
-    C --> D[Agent: Execution Phase]
-    D --> E[LLM: Edit Code File(s)]
-    E --> F[Write Changes to Files]
-    F --> G{Task Complete?}
-    G -- Yes --> H[Done]
-    G -- No (Max Loops) --> I[Agent: Reflection Log]
-    I --> J[Self-Learning API]
-    J --> K[Agent: Self-Edit Source Code]
+    A["User Instruction"] --> B["Agent: Planning Phase"]
+    B --> C["LLM: Generate Step-by-Step Plan"]
+    C --> D["Agent: Execution Phase"]
+    D --> E["LLM: Edit Code File(s)"]
+    E --> F["Write Changes to Files"]
+    F --> G{"Task Complete?"}
+    G -- Yes --> H["Done"]
+    G -- No (Max Loops) --> I["Agent: Reflection Log"]
+    I --> J["Self-Learning API"]
+    J --> K["Agent: Self-Edit Source Code"]
     K --> F
 ```
 
