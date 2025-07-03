@@ -1,32 +1,31 @@
-# Simple Coding Agent
+# mini: The Self-Evolving Coding Agent
 
-A simple, lean, and robust coding agent designed to be maintainable and easy to integrate into your projects—without hefty costs or unnecessary complexity.
+**mini** is an experimental, autonomous coding agent that not only edits and refactors codebases using large language models (LLMs), but also learns from its own actions and can self-edit its own source code to "evolve" over time.
 
-## Goal
+## What is mini?
 
-The goal of this project is to provide a coding agent that is:
-- **Simple**: Minimalistic design, easy to understand and use.
-- **Lean**: No unnecessary dependencies or bloat.
-- **Robust**: Reliable and well-tested core functionality.
-- **Maintainable**: Clean codebase that is easy to extend and maintain.
-- **Easy to Integrate**: Designed for straightforward integration into existing workflows or systems.
-- **Cost-Effective**: No hefty costs or complex setup.
+mini is designed to be a minimal, maintainable, and extensible Python agent that:
+- **Autonomously edits code** based on high-level user instructions using LLMs (e.g., OpenAI GPT-4).
+- **Self-learns** by reflecting on its own failures and generating logs of its reasoning process.
+- **Self-edits** its own source code, using LLM-driven analysis of reflection logs and code diffs, to improve and evolve its capabilities.
+- **Closes the feedback loop** by automatically applying, committing, and pushing its own code changes.
+- **Remains lightweight and easy to integrate** into existing workflows.
 
-## Features
+## Key Features
 
-- Lightweight Python package
-- Clear and concise API
-- Example usage provided
-- Easily extensible for custom needs
-- Includes basic utilities and testing framework
+- **LLM-powered code editing:** Refactor, improve, or transform codebases with natural language instructions.
+- **Self-reflection:** Generates detailed logs when tasks fail or reach complexity limits, capturing its own reasoning and process.
+- **Self-editing and evolution:** Analyzes its own logs and code, proposes and applies improvements to its own source code, and version-controls these changes.
+- **API for self-learning:** Includes a Flask-based API endpoint for receiving reflection logs and triggering self-improvement cycles.
+- **Minimal and extensible:** Clean, lean codebase designed for easy extension and integration.
 
 ## Installation
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/simple-agent.git
-cd simple-agent
+git clone https://github.com/yourusername/mini.git
+cd mini
 ```
 
 (If dependencies are required, add them to a `requirements.txt` and install with `pip install -r requirements.txt`.)
@@ -42,7 +41,32 @@ agent = Agent()
 # Use the agent as needed
 ```
 
+Or run the agent to refactor a project:
+
+```python
+from coding_agent import run_coding_agent
+
+run_coding_agent(
+    prompt="Refactor all functions to use async/await.",
+    code_dir="./my_project",
+    pr_title="Refactor to async/await",
+    pr_body="This PR refactors all functions to use async/await syntax.",
+    pr_branch="refactor-async-await",
+    commit_and_push=True
+)
+```
+
 You may need to configure environment variables. See `.env.example` for reference.
+
+## Self-Learning API
+
+Start the self-learning API server:
+
+```bash
+python self_learning_api.py
+```
+
+The agent will POST reflection logs and self-edit diffs to the `/self-learning` endpoint, which will apply, commit, and push code changes.
 
 ## Testing
 
@@ -58,8 +82,10 @@ python -m unittest discover tests
 coding_agent/
     __init__.py
     agent.py
+    mcp.py
     utils.py
 example.py
+self_learning_api.py
 tests/
     test_agent.py
 .env.example
