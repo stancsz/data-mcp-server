@@ -116,6 +116,114 @@ Usage:
         prompt += f"\n# Extra Instructions\n{extra_instructions}\n"
     return prompt
 
+def agent_self_learn_from_payload(payload):
+    """
+    Self-learning entrypoint: Given a reflection log or self_edit_diffs payload,
+    use the agent's own logic to analyze and edit the codebase.
+    """
+    # If self_edit_diffs are present, treat as a suggestion to review those files
+    # If a reflection log is present, use its info to guide edits
+    from openai import OpenAI
+    import json
+
+    client = OpenAI()
+    modified_files = []
+
+    # Try to extract a user_instruction and plan from the payload
+    user_instruction = payload.get("user_instruction") or "Improve the codebase based on the following reflection log."
+    plan = payload.get("plan")
+    file_path = payload.get("file_path") or None
+
+    # If self_edit_diffs are present, review those files
+    self_edit_diffs = payload.get("self_edit_diffs")
+    files_to_review = []
+    if self_edit_diffs:
+        files_to_review = [entry.get("file") for entry in self_edit_diffs if entry.get("file")]
+
+    # If no files specified, review all agent code files
+    if not files_to_review:
+        files_to_review = [
+            "example.py",
+            "coding_agent/__init__.py",
+            "coding_agent/agent.py",
+            "coding_agent/mcp.py",
+            "coding_agent/utils.py",
+            "tests/test_agent.py"
+        ]
+
+    # For each file, run the agent logic to improve it based on the payload
+    for path in files_to_review:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                file_content = f.read()
+            # Compose a prompt for the agent
+            prompt = (
+                f"{user_instruction}\n"
+                f"Reflection log (if any):\n{json.dumps(payload, indent=2)}\n"
+                f"File path: {path}\n"
+                f"File content:\n{file_content}\n"
+            )
+            # Use the agent's LLM to suggest improvements
+            planning_input = [
+                {
+                    "role": "system",
+                    "content": build_system_prompt(phase="plan")
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            plan_response = client.responses.create(
+                model="gpt-4.1",
+                input=planning_input,
+                text={"format": {"type": "text"}},
+                reasoning={},
+                tools=[],
+                temperature=0.5,
+                max_output_tokens=512,
+                top_p=1,
+                store=True
+            )
+            plan_text = getattr(plan_response, "output_text", "").strip()
+
+            # Execution phase: ask LLM to edit the file according to the plan
+            execution_input = [
+                {
+                    "role": "system",
+                    "content": build_system_prompt(phase="execute")
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"User instruction: {user_instruction}\n"
+                        f"Step-by-step plan:\n{plan_text}\n"
+                        f"File path: {path}\n"
+                        f"File content:\n{file_content}"
+                    )
+                }
+            ]
+            exec_response = client.responses.create(
+                model="gpt-4.1",
+                input=execution_input,
+                text={"format": {"type": "text"}},
+                reasoning={},
+                tools=[],
+                temperature=0.7,
+                max_output_tokens=2048,
+                top_p=1,
+                store=True
+            )
+            after = getattr(exec_response, "output_text", "").strip()
+            if after and after != file_content:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(after)
+                modified_files.append(path)
+        except Exception as e:
+            print(f"Self-learning: failed to process {path}: {e}")
+
+    return modified_files
+
 def run_coding_agent(prompt, file_path):
     """
     Main entrypoint for the coding agent.
