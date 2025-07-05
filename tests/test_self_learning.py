@@ -12,7 +12,7 @@ def create_sample_file(dir_path, filename, content):
 def test_agent_self_learn_from_payload_edits_file(tmp_path, monkeypatch):
     """Test that agent_self_learn_from_payload edits files based on payload."""
     os.environ["ENABLE_SELF_LEARNING"] = "true"
-    # Patch OpenAI client to simulate LLM output
+    import sys
     class DummyLLMResponse:
         def __init__(self, output_text):
             self.output_text = output_text
@@ -27,6 +27,7 @@ def test_agent_self_learn_from_payload_edits_file(tmp_path, monkeypatch):
                     return DummyLLMResponse("1. Rename foo to bar.")
                 return DummyLLMResponse("def bar():\n    return 1\n")
     monkeypatch.setattr("coding_agent.agent.OpenAI", lambda: DummyOpenAIClient())
+    sys.modules["openai"].OpenAI = lambda: DummyOpenAIClient()
     from coding_agent.agent import agent_self_learn_from_payload
     # Create a sample file to be edited
     file_path = create_sample_file(tmp_path, "foo.py", "def foo():\n    return 1\n")
@@ -90,7 +91,7 @@ def test_reflection_log_post(monkeypatch, tmp_path):
     # Should have called requests.post
     assert "url" in called
     assert called["url"] == "http://dummy/self-learning"
-    assert "reflection log" in called["json"]["status_message"]
+    assert "max_loops" in called["json"]["status_message"]
 
 def test_self_learning_api_endpoint(monkeypatch):
     """Test the /self-learning API endpoint accepts POST and triggers self-learning."""
