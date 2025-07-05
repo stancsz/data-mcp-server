@@ -109,6 +109,47 @@ python self_learning_api.py
 
 The agent will POST reflection logs and self-edit diffs to the `/self-learning` endpoint, which will apply, commit, and push code changes.
 
+## Playwright MCP Setup
+
+This project supports browser automation and web testing via the [Playwright MCP](https://github.com/microsoft/playwright-mcp) server.
+
+### Requirements
+
+- Node.js 18 or newer
+
+### Configuration
+
+The Playwright MCP server is already configured in `.vscode/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    }
+  }
+}
+```
+
+If you use VS Code, Cursor, Windsurf, or Claude Desktop, this configuration will automatically launch the Playwright MCP server for you.
+
+### Usage
+
+Once the server is running, the agent can access Playwright MCP tools for browser automation and testing.
+
+To verify your setup, run:
+
+```bash
+pytest tests/test_playwright_mcp.py
+```
+
+This will run a test that uses Playwright MCP to automate a browser and check the result.
+
+-------
+
 ## Testing
 
 Run the tests using:

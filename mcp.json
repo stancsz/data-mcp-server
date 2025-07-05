@@ -1,0 +1,54 @@
+{
+  "servers": [
+    {
+      "name": "github-mcp",
+      "endpoint": "http://localhost:5002",
+      "tools": [
+        {
+          "name": "create_issue",
+          "description": "Create a GitHub issue.",
+          "parameters": [
+            {
+              "name": "repo",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "title",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "required": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "playwright-mcp",
+      "endpoint": "http://localhost:5003",
+      "tools": [
+        {
+          "name": "run_playwright_script",
+          "description": "Run a Playwright script or command.",
+          "parameters": [
+            {
+              "name": "script",
+              "type": "string",
+              "required": true
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "name": "playwright_results",
+          "description": "Provides results from Playwright test runs."
+        }
+      ]
+    }
+  ]
+}
