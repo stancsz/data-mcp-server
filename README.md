@@ -117,6 +117,10 @@ Run the tests using:
 python -m unittest discover tests
 ```
 
+### Dummy Project for Testing
+
+A folder named `tests/dummy project/` is included in this repository. This dummy project is used exclusively for testing purposes. Unit tests may reference this folder, and it should not be considered part of the main application logic.
+
 ## Project Structure
 
 ```
@@ -138,4 +142,4 @@ Contributions are welcome! Please open issues or submit pull requests for improv
 
 ## License
 
-[MIT License](LICENSE) (or specify your license here)
+[MIT License](LICENSE)
