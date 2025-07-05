@@ -469,8 +469,9 @@ class Task:
             json.dump(reflection_log, f, indent=2)
 
         # Check for self-learning integration
+        enable_self_learning = os.environ.get("ENABLE_SELF_LEARNING", "false").lower() == "true"
         self_learning_url = os.environ.get("AGENT_SELF_LEARNING_URL")
-        if self_learning_url:
+        if enable_self_learning and self_learning_url:
             try:
                 import requests
                 resp = requests.post(self_learning_url, json=reflection_log, timeout=10)
@@ -479,8 +480,8 @@ class Task:
                 print(f"Failed to send reflection log to self-learning endpoint: {e}")
 
         # Self-editing: Analyze repo for insufficient code and self-edit, then send diff to self-learning endpoint
-        # Only proceed if self_learning_url is set
-        if self_learning_url:
+        # Only proceed if self-learning is enabled and self_learning_url is set
+        if enable_self_learning and self_learning_url:
             python_files = [
                 "example.py",
                 "coding_agent/__init__.py",
