@@ -444,7 +444,9 @@ class Task:
         # Brief error message for filename
         brief_error = re.sub(r'[^a-zA-Z0-9_ -]', '', self.status_message)[:40].replace(' ', '_')
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"reflection log - {brief_error}_{timestamp}.json"
+        log_dir = "log"
+        os.makedirs(log_dir, exist_ok=True)
+        filename = os.path.join(log_dir, f"reflection log - {brief_error}_{timestamp}.json")
 
         # Gather thoughts (all conversation history)
         thoughts = self.conversation

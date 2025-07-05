@@ -103,7 +103,7 @@ def test_self_learning_api_endpoint(monkeypatch):
         return ["foo.py"]
     monkeypatch.setattr("coding_agent.agent.agent_self_learn_from_payload", dummy_learn)
     # Import Flask app
-    import self_learning_api
+    from backend import self_learning_api
     app = self_learning_api.app
     client = app.test_client()
     payload = {"user_instruction": "Improve code."}
