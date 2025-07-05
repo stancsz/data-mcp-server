@@ -7,6 +7,12 @@ def read_file(path):
         return f.read()
 
 def write_file(path, content):
+    import re
+    # If content is wrapped in <write_file> and <content> tags, extract the inner content
+    if "<write_file>" in content and "<content>" in content and "</content>" in content:
+        match = re.search(r"<content>(.*?)</content>", content, re.DOTALL)
+        if match:
+            content = match.group(1).strip()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)

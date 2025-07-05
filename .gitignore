@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Ignore dummy project test copies
+tests/dummy project__*__test__/
+
 # C extensions
 *.so
 

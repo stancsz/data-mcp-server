@@ -298,6 +298,10 @@ def run_coding_agent(prompt, file_path):
     after = getattr(exec_response, "output_text", "").strip()
 
     # 3. Write the new file if changed
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger(__name__)
+    logger.info(f"LLM output for {file_path}:\n{after}")
     if after and after != before:
         write_file(file_path, after)
         modified_files.append(file_path)
