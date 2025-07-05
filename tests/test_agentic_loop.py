@@ -92,11 +92,14 @@ def test_agentic_loop_max_loops_reflection(monkeypatch, temp_code_file):
     task.start()
     # Should exit due to max_loops
     assert "max_loops" in task.status_message
-    # Check that a reflection log file was created
-    logs = [f for f in os.listdir() if f.startswith("reflection log")]
+    # Check that a reflection log file was created in log/
+    log_dir = "log"
+    logs = []
+    if os.path.exists(log_dir):
+        logs = [f for f in os.listdir(log_dir) if f.startswith("reflection log")]
     assert logs, "No reflection log generated"
     # Optionally, check contents of the log
-    with open(logs[0], encoding="utf-8") as f:
+    with open(os.path.join(log_dir, logs[0]), encoding="utf-8") as f:
         log = json.load(f)
     assert log["loop_count"] == 5
     assert log["status_message"].startswith("Agentic loop exited after reaching max_loops")
