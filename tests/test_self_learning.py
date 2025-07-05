@@ -13,6 +13,7 @@ def create_sample_file(dir_path, filename, content):
 
 def test_agent_self_learn_from_payload_edits_file(tmp_path, monkeypatch):
     """Test that agent_self_learn_from_payload edits files based on payload."""
+    os.environ["ENABLE_SELF_LEARNING"] = "true"
     # Create a sample file to be edited
     file_path = create_sample_file(tmp_path, "foo.py", "def foo():\n    return 1\n")
     payload = {
@@ -57,6 +58,7 @@ def test_reflection_log_post(monkeypatch, tmp_path):
     monkeypatch.setattr("requests.post", dummy_post)
     # Set env var for self-learning URL
     os.environ["AGENT_SELF_LEARNING_URL"] = "http://dummy/self-learning"
+    os.environ["ENABLE_SELF_LEARNING"] = "true"
     # Import Task here to pick up monkeypatch
     from coding_agent.agent import Task
     # Create a dummy file
@@ -94,6 +96,7 @@ def test_reflection_log_post(monkeypatch, tmp_path):
 def test_self_learning_api_endpoint(monkeypatch):
     """Test the /self-learning API endpoint accepts POST and triggers self-learning."""
     # Patch agent_self_learn_from_payload to record call
+    os.environ["ENABLE_SELF_LEARNING"] = "true"
     called = {}
     def dummy_learn(payload):
         called["payload"] = payload
