@@ -3,8 +3,6 @@ import tempfile
 import json
 import pytest
 
-from coding_agent.agent import agent_self_learn_from_payload
-
 def create_sample_file(dir_path, filename, content):
     file_path = os.path.join(dir_path, filename)
     with open(file_path, "w", encoding="utf-8") as f:
@@ -14,14 +12,6 @@ def create_sample_file(dir_path, filename, content):
 def test_agent_self_learn_from_payload_edits_file(tmp_path, monkeypatch):
     """Test that agent_self_learn_from_payload edits files based on payload."""
     os.environ["ENABLE_SELF_LEARNING"] = "true"
-    # Create a sample file to be edited
-    file_path = create_sample_file(tmp_path, "foo.py", "def foo():\n    return 1\n")
-    payload = {
-        "user_instruction": "Rename function foo to bar.",
-        "file_path": str(file_path),
-        "plan": "1. Rename foo to bar.",
-        "self_edit_diffs": [{"file": str(file_path)}]
-    }
     # Patch OpenAI client to simulate LLM output
     class DummyLLMResponse:
         def __init__(self, output_text):
@@ -33,10 +23,19 @@ def test_agent_self_learn_from_payload_edits_file(tmp_path, monkeypatch):
             @staticmethod
             def create(*args, **kwargs):
                 # Always return a plan or new file content
-                if "plan" in args[0][1]["content"]:
+                if args and len(args) > 0 and "plan" in args[0][1]["content"]:
                     return DummyLLMResponse("1. Rename foo to bar.")
                 return DummyLLMResponse("def bar():\n    return 1\n")
     monkeypatch.setattr("coding_agent.agent.OpenAI", lambda: DummyOpenAIClient())
+    from coding_agent.agent import agent_self_learn_from_payload
+    # Create a sample file to be edited
+    file_path = create_sample_file(tmp_path, "foo.py", "def foo():\n    return 1\n")
+    payload = {
+        "user_instruction": "Rename function foo to bar.",
+        "file_path": str(file_path),
+        "plan": "1. Rename foo to bar.",
+        "self_edit_diffs": [{"file": str(file_path)}]
+    }
     modified = agent_self_learn_from_payload(payload)
     # Check that the file was edited
     with open(file_path, encoding="utf-8") as f:
@@ -74,7 +73,7 @@ def test_reflection_log_post(monkeypatch, tmp_path):
         class responses:
             @staticmethod
             def create(*args, **kwargs):
-                if "plan" in args[0][1]["content"]:
+                if args and len(args) > 0 and "plan" in args[0][1]["content"]:
                     return DummyLLMResponse("1. Do nothing.")
                 return DummyLLMResponse("<write_file><content>def foo():\n    return 1\n</content></write_file>")
     monkeypatch.setattr("coding_agent.agent.OpenAI", lambda: DummyOpenAIClient())
