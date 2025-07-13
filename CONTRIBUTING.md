@@ -2,6 +2,18 @@
 
 First off, thank you for considering contributing to mini! It’s people like you that make open source projects like this thrive.
 
+## The Era of Vibe Coding
+
+This project encourages a new way of working, which we call "Vibe Coding." In this paradigm, the focus shifts from writing code line-by-line to sharing ideas, guiding the AI agent, and influencing the project's direction. Your ability to articulate concepts, identify logical flaws, and collaborate on the overall architecture is more valuable than ever.
+
+Here’s how you can contribute in this new era:
+
+1.  **Join the Architecture Discussion:** Participate in discussions about the project's design and future direction. Your insights can help shape the agent's evolution.
+2.  **Raise Issues on Logical Flaws:** If you spot a flaw in the agent's reasoning or the project's logic, open an issue. Your critical eye is essential for the project's integrity.
+3.  **Report Bugs and Submit Logs:** When you encounter a bug, report it with as much detail as possible. Submitting logs from the agent's operations is incredibly helpful for debugging and improving the system.
+4.  **Share Techniques and Agentic Designs:** If you have experience with other AI agents or have ideas for new agentic designs, share them! We are always looking to learn from other projects and incorporate new techniques.
+
+
 ## Where to Start
 
 mini is an experimental project, and there are many ways to contribute. Whether you're a seasoned developer or just starting, your input is valuable. Here are a few areas where you can help:
