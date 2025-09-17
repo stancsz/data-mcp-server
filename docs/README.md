@@ -1,11 +1,12 @@
 # data-mcp
 
-data-mcp is an MCP (Model Context Protocol) server built with the fastmcp framework (https://github.com/jlowin/fastmcp). It provides a secure, enterprise-ready bridge that allows AI agents to interact with major data platforms on AWS and GCP. The server exposes data access and data-pipeline capabilities to agents while enforcing service-account based authentication and policy-driven authorization (RBAC / ABAC).
+data-mcp is an AI-first control plane built on the Model Context Protocol (MCP) that enables agentic systems to securely discover, access, transform, and deploy data-driven applications across cloud providers (AWS, GCP). It combines data connectors, infrastructure-as-code, and GitOps to let intelligent agents design, provision, and operate production-ready data pipelines and services while preserving governance and auditability.
 
-Sales pitch — why this matters for platform engineering:
-- Platform teams are expected to deliver secure, repeatable, and fast developer experiences while reducing time-to-production. data-mcp provides an AI-first control plane that lets agentic systems design, provision, and operate data infrastructure and applications with policy-driven safety and auditability.
-- By combining data access (S3/Dynamo/BigQuery), infrastructure-as-code (Terraform), and GitOps (ArgoCD), data-mcp reduces the friction between data discovery, pipeline development, and production deployment — accelerating platform engineering velocity while preserving governance and observability.
-- This capability is increasingly critical as organizations adopt agentic workflows and expect platforms to enable safe, automated composition of data apps, ML services, and infra changes without manual orchestration overhead.
+Why it matters — concise impact statement:
+- Accelerates platform engineering by reducing time-to-production for data applications and ML services.
+- Enables agents to autonomously generate and deploy infrastructure (Terraform) and application manifests (Helm/ArgoCD) with policy and approval gates.
+- Preserves enterprise controls: service-account based auth, least-privilege operations, audit trails, and policy-as-code.
+- Lowers operational overhead and enables repeatable, versioned, Git-driven deployments for data pipelines and full-stack AI prototypes.
 
 High-level architecture (mermaid)
 
