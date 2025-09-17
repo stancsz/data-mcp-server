@@ -1,0 +1,10 @@
+apiVersion: v2
+name: example-data-app
+description: A minimal Helm chart for the example data application used by DataMCP
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - data
+  - example
+  - demo
