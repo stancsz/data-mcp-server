@@ -23,6 +23,7 @@ Tools provided:
 from __future__ import annotations
 import argparse
 import logging
+import shlex
 from typing import Optional, Dict, Any, List
 
 from fastmcp import FastMCP
@@ -31,6 +32,7 @@ from config import aws_credentials_dict
 from aws.s3_client import S3Client
 from aws.dynamo_client import DynamoClient
 from boto3.dynamodb.conditions import Key  # type: ignore
+from tools.runner import run_cmd, CommandResult
 
 LOG = logging.getLogger(__name__)
 
@@ -158,6 +160,106 @@ def parse_args():
     parser.add_argument("--transport", default=None, help="Transport to use (e.g. http, stdio).")
     parser.add_argument("--port", type=int, default=None, help="Port for HTTP transport.")
     return parser.parse_args()
+
+
+@mcp.tool
+def apply_terraform(cloud: str, env: str, workspace: Optional[str] = None, vars: Optional[Dict[str, Any]] = None, dry_run: bool = True, auto_approve: bool = False) -> Dict[str, Any]:
+    """
+    MCP tool skeleton to run terraform operations for a given cloud and environment.
+    This function runs in dry_run mode by default. It locates infra/{cloud}/envs/{env}
+    and runs terraform init/plan (and apply if auto_approve is True).
+    Returns a structured dict with command outputs and status.
+    """
+    # locate directory
+    tf_dir = f"infra/{cloud}/envs/{env}"
+    if vars:
+        # For a real implementation, write vars to a temporary tfvars file and pass via -var-file
+        var_args = " ".join(f"-var '{k}={v}'" for k, v in (vars or {}).items())
+    else:
+        var_args = ""
+
+    init_cmd = ["terraform", "init", "-input=false"]
+    plan_cmd = ["terraform", "plan", "-input=false", "-no-color"] + (shlex.split(var_args) if var_args else [])
+    result_init = run_cmd(init_cmd, cwd=tf_dir, dry_run=dry_run)
+    result_plan = run_cmd(plan_cmd, cwd=tf_dir, dry_run=dry_run)
+
+    apply_result = None
+    if auto_approve:
+        apply_cmd = ["terraform", "apply", "-auto-approve", "-input=false"] + (shlex.split(var_args) if var_args else [])
+        apply_result = run_cmd(apply_cmd, cwd=tf_dir, dry_run=dry_run)
+
+    return {
+        "init": {"rc": result_init.returncode, "stdout": result_init.stdout, "stderr": result_init.stderr},
+        "plan": {"rc": result_plan.returncode, "stdout": result_plan.stdout, "stderr": result_plan.stderr},
+        "apply": ({"rc": apply_result.returncode, "stdout": apply_result.stdout, "stderr": apply_result.stderr} if apply_result else None),
+        "succeeded": (result_init.returncode == 0 and result_plan.returncode == 0 and (apply_result.returncode == 0 if apply_result else True))
+    }
+
+
+@mcp.tool
+def destroy_terraform(cloud: str, env: str, dry_run: bool = True, auto_approve: bool = False) -> Dict[str, Any]:
+    """
+    MCP tool skeleton to destroy terraform-managed infra.
+    """
+    tf_dir = f"infra/{cloud}/envs/{env}"
+    plan_cmd = ["terraform", "plan", "-destroy", "-input=false", "-no-color"]
+    result_plan = run_cmd(plan_cmd, cwd=tf_dir, dry_run=dry_run)
+    destroy_result = None
+    if auto_approve:
+        destroy_cmd = ["terraform", "destroy", "-auto-approve", "-input=false"]
+        destroy_result = run_cmd(destroy_cmd, cwd=tf_dir, dry_run=dry_run)
+    return {
+        "plan": {"rc": result_plan.returncode, "stdout": result_plan.stdout, "stderr": result_plan.stderr},
+        "destroy": ({"rc": destroy_result.returncode, "stdout": destroy_result.stdout, "stderr": destroy_result.stderr} if destroy_result else None),
+        "succeeded": (result_plan.returncode == 0 and (destroy_result.returncode == 0 if destroy_result else True))
+    }
+
+
+@mcp.tool
+def helm_deploy(kube_context: Optional[str], chart_path: str, release_name: str, namespace: str, values: Optional[Dict[str, Any]] = None, dry_run: bool = True) -> Dict[str, Any]:
+    """
+    MCP tool skeleton to install/upgrade a Helm chart.
+    """
+    kube_ctx_args = ["--kube-context", kube_context] if kube_context else []
+    values_args = []
+    if values:
+        # In a production implementation we'd write values to a temp file and pass -f <file>
+        for k, v in (values or {}).items():
+            values_args += ["--set", f"{k}={v}"]
+
+    cmd = ["helm", "upgrade", "--install", release_name, chart_path, "--namespace", namespace, "--create-namespace"] + kube_ctx_args + values_args
+    result = run_cmd(cmd, dry_run=dry_run)
+    return {"rc": result.returncode, "stdout": result.stdout, "stderr": result.stderr, "succeeded": result.returncode == 0}
+
+
+@mcp.tool
+def argo_sync(app_name: str, argocd_ctx: Optional[str] = None, dry_run: bool = True) -> Dict[str, Any]:
+    """
+    MCP tool skeleton to sync an ArgoCD application by name using the argocd CLI.
+    """
+    ctx_args = ["--grpc-web", "--server", argocd_ctx] if argocd_ctx else []
+    cmd = ["argocd", "app", "sync", app_name] + ctx_args
+    result = run_cmd(cmd, dry_run=dry_run)
+    return {"rc": result.returncode, "stdout": result.stdout, "stderr": result.stderr, "succeeded": result.returncode == 0}
+
+
+@mcp.tool
+def gcp_create_project(project_id: str, billing_account: str, org_id: Optional[str] = None, dry_run: bool = True) -> Dict[str, Any]:
+    """
+    MCP tool skeleton to create a GCP project using gcloud CLI. Requires organization permissions.
+    """
+    cmd = ["gcloud", "projects", "create", project_id, "--name", project_id]
+    if org_id:
+        cmd += ["--organization", org_id]
+    # billing
+    billing_cmd = ["gcloud", "beta", "billing", "projects", "link", project_id, "--billing-account", billing_account]
+    create_result = run_cmd(cmd, dry_run=dry_run)
+    billing_result = run_cmd(billing_cmd, dry_run=dry_run)
+    return {
+        "create": {"rc": create_result.returncode, "stdout": create_result.stdout, "stderr": create_result.stderr},
+        "billing": {"rc": billing_result.returncode, "stdout": billing_result.stdout, "stderr": billing_result.stderr},
+        "succeeded": create_result.returncode == 0 and billing_result.returncode == 0
+    }
 
 
 def run():

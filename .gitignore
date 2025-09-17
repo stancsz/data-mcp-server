@@ -1,1 +1,95 @@
-~
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Virtual envs
+.env
+.env.*
+.venv/
+venv/
+venv*/
+ENV/
+env/
+.python-version
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and reports
+logs/
+*.log
+coverage.*
+htmlcov/
+report.xml
+
+# Pytest
+.pytest_cache/
+
+# Node modules
+node_modules/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+terraform.tfvars
+terraform.tfvars.json
+*.tfplan
+
+# Ignore terraform state and lock files in infra tree explicitly
+infra/**/.terraform
+infra/**/terraform.tfstate
+infra/**/terraform.tfstate.*
+infra/**/.terraform.lock.hcl
+infra/**/*.tfvars
+infra/**/*.tfplan
+
+# Helm / Kubernetes
+*.kubeconfig
+helm-debug.*
+charts/*.tgz
+
+# Secrets / keys (do not commit credentials)
+secrets/
+*.key
+*.pem
+*.p12
+# common service account or key files - keep broad to be safe
+*-key.json
+*-service-account.json
+service-account-*.json
+*.creds.json
+
+# GCP / AWS SDK caches and local files
+*.gcloud/
+*.aws/
+
+# Tools / temporary files
+tools/*.log
+*.swp
+*~
+
+# Python packaging artifacts
+*.egg
+*.whl
+
+# Misc
+.idea/
