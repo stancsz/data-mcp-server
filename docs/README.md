@@ -8,21 +8,66 @@ Sales pitch — why this matters for platform engineering:
 - This capability is increasingly critical as organizations adopt agentic workflows and expect platforms to enable safe, automated composition of data apps, ML services, and infra changes without manual orchestration overhead.
 
 High-level architecture (mermaid)
+
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'fontSize':'16px'}, 'flowchart': {'nodeSpacing': 80, 'rankSpacing': 80}}}%%
 flowchart LR
-  Agent["AI Agent (agentic devops)"] -->|MCP API| MCP["data-mcp Server"]
-  MCP -->|read/write| S3["S3"]
-  MCP -->|read/write| Dynamo["DynamoDB"]
-  MCP -->|query| BQ["BigQuery"]
-  MCP -->|generate infra| TF["Terraform Modules"]
-  TF -->|provision| Cloud["Cloud Infra (AWS/GCP)"]
-  MCP -->|commit charts & manifests| GitRepo["Git Repo (Helm/Manifests)"]
-  GitRepo -->|reconcile| ArgoCD["ArgoCD (GitOps)"]
-  ArgoCD -->|deploy| K8s["Kubernetes Cluster"]
-  K8s -->|run| App["Data Pipelines / ML Services"]
-  App -->|metrics & logs| Observability["Logging / Metrics / Tracing"]
+  %% Agentic system
+  subgraph AgentSystem["Agentic System"]
+    AGENT["AI Agent\n(agentic devops)"]
+  end
+
+  %% Control plane
+  subgraph MCPCluster["data-mcp Control Plane"]
+    MCP["data-mcp Server"]
+    subgraph Connectors["Connectors"]
+      S3["S3"]
+      DDB["DynamoDB"]
+      BQ["BigQuery"]
+    end
+    TF["Terraform Modules"]
+    GitRepo["Git Repo\n(Helm / Manifests)"]
+  end
+
+  %% GitOps & infra
+  subgraph GitOps["GitOps / Deployment"]
+    ArgoCD["ArgoCD\n(GitOps)"]
+  end
+
+  subgraph CloudInfra["Cloud Infrastructure"]
+    CLOUD["Cloud Infra\n(AWS / GCP)"]
+  end
+
+  %% Kubernetes / runtime
+  subgraph Kubernetes["Kubernetes Cluster"]
+    K8S["Kubernetes\n(Clusters / Namespaces)"]
+    APP["Data Pipelines / ML Services"]
+  end
+
+  OBS["Observability\n(Logging / Metrics / Tracing)"]
+
+  %% Flows
+  AGENT -->|MCP API| MCP
+  MCP -->|read / write| S3
+  MCP -->|read / write| DDB
+  MCP -->|query| BQ
+  MCP -->|generate infra| TF
+  TF -->|provision| CLOUD
+  MCP -->|commit charts & manifests| GitRepo
+  GitRepo -->|reconcile| ArgoCD
+  ArgoCD -->|deploy| K8S
+  K8S -->|run| APP
+  APP -->|emit| OBS
+
+  %% Styling for clarity
   style MCP fill:#f9f,stroke:#333,stroke-width:1px
   style TF fill:#ffefb3,stroke:#333,stroke-width:1px
+  style AGENT fill:#e6f7ff,stroke:#333,stroke-width:1px
+  style Connectors fill:#ffffff,stroke:#888,stroke-width:1px
+  style GitRepo fill:#fff7e6,stroke:#333,stroke-width:1px
+  style ArgoCD fill:#f0fff0,stroke:#333,stroke-width:1px
+  style K8S fill:#f7f7ff,stroke:#333,stroke-width:1px
+  style OBS fill:#fff,stroke:#666,stroke-width:1px
 ```
 
 Key goals:
