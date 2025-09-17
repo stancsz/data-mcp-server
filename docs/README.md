@@ -2,6 +2,29 @@
 
 data-mcp is an MCP (Model Context Protocol) server built with the fastmcp framework (https://github.com/jlowin/fastmcp). It provides a secure, enterprise-ready bridge that allows AI agents to interact with major data platforms on AWS and GCP. The server exposes data access and data-pipeline capabilities to agents while enforcing service-account based authentication and policy-driven authorization (RBAC / ABAC).
 
+Sales pitch — why this matters for platform engineering:
+- Platform teams are expected to deliver secure, repeatable, and fast developer experiences while reducing time-to-production. data-mcp provides an AI-first control plane that lets agentic systems design, provision, and operate data infrastructure and applications with policy-driven safety and auditability.
+- By combining data access (S3/Dynamo/BigQuery), infrastructure-as-code (Terraform), and GitOps (ArgoCD), data-mcp reduces the friction between data discovery, pipeline development, and production deployment — accelerating platform engineering velocity while preserving governance and observability.
+- This capability is increasingly critical as organizations adopt agentic workflows and expect platforms to enable safe, automated composition of data apps, ML services, and infra changes without manual orchestration overhead.
+
+High-level architecture (mermaid)
+```mermaid
+flowchart LR
+  Agent["AI Agent (agentic devops)"] -->|MCP API| MCP["data-mcp Server"]
+  MCP -->|read/write| S3["S3"]
+  MCP -->|read/write| Dynamo["DynamoDB"]
+  MCP -->|query| BQ["BigQuery"]
+  MCP -->|generate infra| TF["Terraform Modules"]
+  TF -->|provision| Cloud["Cloud Infra (AWS/GCP)"]
+  MCP -->|commit charts & manifests| GitRepo["Git Repo (Helm/Manifests)"]
+  GitRepo -->|reconcile| ArgoCD["ArgoCD (GitOps)"]
+  ArgoCD -->|deploy| K8s["Kubernetes Cluster"]
+  K8s -->|run| App["Data Pipelines / ML Services"]
+  App -->|metrics & logs| Observability["Logging / Metrics / Tracing"]
+  style MCP fill:#f9f,stroke:#333,stroke-width:1px
+  style TF fill:#ffefb3,stroke:#333,stroke-width:1px
+```
+
 Key goals:
 - Securely expose AWS and GCP data sources to agentic systems via MCP.
 - Use service-account based authentication to enable role/attribute-based access control.
@@ -228,6 +251,78 @@ Example (pseudocode) request payload
 - Introduce connectors for additional cloud and on-prem data warehouses.
 - Add an audit UI for compliance teams to review agent activity and data flows.
 - Implement policy templates for common enterprise compliance regimes (SOC2, HIPAA, GDPR).
+- Integrate with ArgoCD for GitOps deployments of Kubernetes manifests and Helm charts.
+  - The MCP server will be able to author, update, and push Helm charts and Kubernetes manifests to a Git repository watched by ArgoCD.
+  - ArgoCD will continuously reconcile the Git repo to the target Kubernetes cluster, enabling automated deployment of data pipelines and services.
+- Provide Terraform automation hooks for provisioning cloud infrastructure (AWS/GCP) programmatically.
+  - Agents can generate Terraform plans/modules that the MCP server can apply (via a controlled runner) or commit to a repo for CI/CD.
+  - The server will include opinionated Terraform templates for common infra (VPCs, EKS/GKE clusters, IAM roles, S3/Dynamo/GCS, managed databases).
+- End-to-end deployment capability:
+  - The MCP server is capable of provisioning required infra, building and packaging pipeline components (containers/Helm charts), and deploying them to Kubernetes using ArgoCD.
+  - The MCP server can install the necessary resources (service accounts, RBAC bindings, ArgoCD app manifests, Terraform state backends) to enable seamless agent-driven deployments.
+- Roadmap priorities:
+  1. Harden ArgoCD integration: secure Git credentials, app lifecycle management, audit trails for deployments.
+  2. Terraform runner & safe apply: interactive approvals, plan inspection, and policy gates.
+  3. Templates & blueprints: ready-made pipeline, ML-serving, and full-stack app blueprints.
+  4. Observability: bundle logging, metrics, and tracing for deployed pipelines and infra changes.
+  5. Compliance: policy-as-code integration (e.g., OPA/Gatekeeper) to prevent insecure deployments.
+
+## Endgame / Project Purpose
+This project's long-term goal is to enable AI agents to rapidly design, provision, and ship production-grade data applications. The "data-mcp" server is intended to be the control-plane that allows an agent to:
+- Discover and pull data from sources (S3, DynamoDB, BigQuery, etc.).
+- Assemble data pipelines (transformations, joins, ML features).
+- Provision infrastructure as code (Terraform) and deploy applications/pipelines to Kubernetes (Helm / ArgoCD).
+- Manage lifecycle and audits for deployments, ensuring least-privilege operations and traceability.
+
+## Agent Examples & Diagrams
+Below are example workflows and Mermaid diagrams showing how an AI agent can use this MCP server to build and deploy data apps.
+
+Example 1 — Data pipeline creation + Kubernetes deployment (ArgoCD)
+- Agent pulls raw data from DynamoDB and S3.
+- Agent generates a pipeline (container + Helm chart) that performs ETL and writes back results.
+- Agent commits the Helm chart and manifests to a Git repo watched by ArgoCD.
+- ArgoCD deploys the Helm chart to the target cluster and keeps it reconciled.
+
+```mermaid
+flowchart LR
+  Agent["AI Agent"] -->|MCP API: run_probe| MCP["data-mcp Server"]
+  MCP -->|fetch| S3["S3 (raw objects)"]
+  MCP -->|fetch| Dynamo["DynamoDB (tables)"]
+  MCP -->|process| PipelineBuilder["Pipeline Builder (container/helm)"]
+  PipelineBuilder -->|commit to git| GitRepo["Git repo (charts/manifests)"]
+  GitRepo -->|watch & reconcile| ArgoCD["ArgoCD"]
+  ArgoCD -->|deploy| K8s["Kubernetes Cluster"]
+  K8s -->|run| ETL["ETL Job (pod/cron)"]
+  ETL -->|write| Results["S3 / GCS destination"]
+  style MCP fill:#f9f,stroke:#333,stroke-width:1px
+```
+
+Example 2 — Full-stack AI app prototype with Terraform + ML forecast
+- Agent inspects a table (e.g., orders) in DynamoDB or a dataset in S3 to estimate data needs.
+- Agent generates Terraform to provision infra: EKS/GKE cluster, managed DB, object storage, IAM roles.
+- Agent generates application code scaffolding (frontend + backend + ML API) and Terraform/Terragrunt to deploy.
+- Agent builds ML model (demand forecast) and exposes it via an API in the deployed stack.
+- The MCP server can apply Terraform (with appropriate approvals) and push the application manifests to ArgoCD for deployment.
+
+```mermaid
+flowchart TD
+  Agent["AI Agent"] -->|analyze data| MCP["data-mcp Server"]
+  MCP -->|read| Dynamo["DynamoDB"]
+  MCP -->|read| S3["S3"]
+  Agent -->|generate terraform| TF["Terraform module"]
+  TF -->|plan & apply| Infra["Cloud infrastructure (VPC, EKS/GKE, DB)"]
+  Agent -->|generate app & helm| AppRepo["App repo (frontend/backend/ml-api + helm)"]
+  AppRepo -->|commit| GitRepo["Git repo (charts)"]
+  GitRepo -->|reconcile| ArgoCD["ArgoCD"]
+  ArgoCD -->|deploy| K8s["Kubernetes Cluster"]
+  K8s -->|run| App["Full-stack AI App (frontend/backend/ml-api)"]
+  App -->|forecast| Drone["Drone Delivery Service (uses forecast)"]
+  style TF fill:#ffefb3,stroke:#333,stroke-width:1px
+```
+
+Notes:
+- These examples are illustrative. Actual implementations should include security checks, policy gates, and manual approval steps where appropriate (especially for Terraform apply).
+- The repository will include templates/blueprints for common pipelines and full-stack prototypes to accelerate agent workflows.
 
 ## Contact & support
 - Repo: https://github.com/stancsz/data-mcp-server
