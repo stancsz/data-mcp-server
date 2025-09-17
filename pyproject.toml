@@ -1,0 +1,19 @@
+[project]
+name = "data-mcp-server"
+version = "0.0.0"
+description = "Example FastMCP server scaffold (minimal)."
+readme = "README_FASTMCP.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp",          # install from PyPI by default
+    "httpx",            # useful for clients & HTTP transport
+]
+
+[project.scripts]
+# helper convenience: runs the example server using the installed python
+# Note: this expects my_server.py to be importable as a module path; you can also run `python my_server.py`.
+run-server = "python:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
