@@ -7,6 +7,8 @@ requires-python = ">=3.10"
 dependencies = [
     "fastmcp",          # install from PyPI by default
     "httpx",            # useful for clients & HTTP transport
+    "boto3",            # AWS SDK for Python (S3, DynamoDB)
+    "python-dotenv",    # load .env files for local development
 ]
 
 [project.scripts]
