@@ -1,186 +1,238 @@
-# mini: The Self-Evolving Coding Agent
+# data-mcp
 
-**mini** is an experimental, autonomous coding agent that not only edits and refactors codebases using large language models (LLMs), but also learns from its own actions and can self-edit its own source code to "evolve" over time.
+data-mcp is an MCP (Model Context Protocol) server built with the fastmcp framework (https://github.com/jlowin/fastmcp). It provides a secure, enterprise-ready bridge that allows AI agents to interact with major data platforms on AWS and GCP. The server exposes data access and data-pipeline capabilities to agents while enforcing service-account based authentication and policy-driven authorization (RBAC / ABAC).
 
-## What is mini?
+Key goals:
+- Securely expose AWS and GCP data sources to agentic systems via MCP.
+- Use service-account based authentication to enable role/attribute-based access control.
+- Provide built-in agentic capabilities: probe caching (Redis), multi-source data retrieval, transformation and onward delivery.
+- Support common enterprise data systems: S3, Redshift, DynamoDB, GCS, BigQuery.
 
-mini is designed to be a minimal, maintainable, and extensible Python agent that:
-- **Autonomously edits code** based on high-level user instructions using LLMs (e.g., OpenAI GPT-4).
-- **Self-learns** by reflecting on its own failures and generating logs of its reasoning process.
-- **Self-edits** its own source code, using LLM-driven analysis of reflection logs and code diffs, to improve and evolve its capabilities.
-- **Closes the feedback loop** by automatically applying, committing, and pushing its own code changes.
-- **Remains lightweight and easy to integrate** into existing workflows.
+Table of contents
+- Features
+- Architecture overview
+- Supported connectors
+- Security & access control (Service Accounts, RBAC / ABAC)
+- Agentic capabilities (Redis caching, probe data, pipelines)
+- Quick start
+- Configuration examples
+- Usage patterns & examples
+- Development notes
+- Contributing
+- License
 
-## Key Features
+## Features
+- FastMCP-based MCP server for delivering data access functionality to AI agents.
+- Connectors for:
+  - AWS: S3, Redshift, DynamoDB
+  - GCP: GCS, BigQuery
+- Service Account control:
+  - Agents authenticate using service account credentials (SA).
+  - The MCP server relays SA credentials when authorized, enabling secure, role-based and attribute-based access.
+  - Enterprise-grade control model for least-privilege access.
+- Agentic abilities:
+  - Redis-backed caching for probe results, reducing repeated expensive fetches.
+  - Ability to probe multiple sources, merge/transform results, and write to a specified target.
+  - Pluggable pipeline stages: fetch -> process -> transform -> deliver.
+- Audit-friendly: logs and access patterns designed for auditability in enterprise environments.
 
-- **LLM-powered code editing:** Refactor, improve, or transform codebases with natural language instructions.
-- **Self-reflection:** Generates detailed logs when tasks fail or reach complexity limits, capturing its own reasoning and process.
-- **Self-editing and evolution:** Analyzes its own logs and code, proposes and applies improvements to its own source code, and version-controls these changes.
-- **API for self-learning:** Includes a Flask-based API endpoint for receiving reflection logs and triggering self-improvement cycles.
-- **Minimal and extensible:** Clean, lean codebase designed for easy extension and integration.
+## Architecture overview
+1. Agent (client) connects to the MCP server via the fastmcp protocol.
+2. Agent authenticates using a service account credential (SA token/JSON/key).
+3. MCP validates the SA against local policies and maps it to allowed roles/attributes.
+4. Agent requests data access or pipeline execution.
+5. MCP:
+   - Optionally checks Redis cache for recent probe results.
+   - If needed, pulls data from up to two (or more) configured sources (e.g., S3 + BigQuery).
+   - Runs processing/transform steps (user-defined or built-in).
+   - Writes/transfers the result to a requested destination (S3/GCS/etc.) if authorized.
+6. MCP returns structured results and stores audit logs.
 
-## Installation
+A high-level diagram (textual):
+Agent -> fastmcp -> data-mcp server
+data-mcp server -> [Auth/Policy Engine] -> [Redis cache] -> [Connectors: S3, Redshift, DynamoDB, GCS, BigQuery] -> [Processing/Transforms] -> [Destination]
 
-Clone the repository:
+## Supported connectors
+- AWS
+  - S3: object storage access
+  - Redshift: data warehouse queries & exports
+  - DynamoDB: key/value and document data access
+- GCP
+  - GCS: object storage access
+  - BigQuery: analytics queries & exports
 
-```bash
-git clone https://github.com/stancsz/mini.git
-cd mini
+Connectors are implemented as modular adapters so adding other data systems should be straightforward.
+
+## Security & Access Control
+- Service Accounts (SA) are the primary authentication mechanism.
+  - Agents present SA credentials to the MCP server.
+  - MCP validates and, if authorized, uses or relays SA credentials to access cloud resources on behalf of the agent.
+- Role-Based Access Control (RBAC)
+  - Map SAs to roles that define allowed data operations and resources.
+- Attribute-Based Access Control (ABAC)
+  - Policies may consider attributes like environment, project, agent id, time-of-day, and resource tags.
+- Principle of least privilege
+  - The MCP server aims to only allow resource access consistent with the SA’s effective permissions and local policy.
+- Auditing & logging
+  - All access requests, relayed credential usage, and pipeline operations should be logged for compliance.
+
+## Agentic capabilities
+- Redis caching:
+  - Probe results can be cached in Redis to reduce duplicate expensive reads.
+  - Cache keys are derived from probe parameters (sources, query, credentials scope).
+- Multi-source probes:
+  - The server can fetch from two different sources, merge or stitch datasets, then process them (join, aggregate, filter).
+- Processing & Transforms:
+  - Built-in transforms (filter, aggregation, format change) and a plugin hook for custom processors.
+- Delivery:
+  - After processing, results can be sent to a target destination chosen by the agent (S3, GCS, or other sinks) given authorization.
+
+Example flow:
+1. Agent requests a combined probe: S3 (parquet) + BigQuery (query) for a specified time range.
+2. MCP checks Redis for cached result.
+3. If not cached, MCP pulls data from both sources, runs a processing pipeline (sample normalization + aggregation), stores the output to a destination (GCS), and caches the probe result.
+4. MCP returns a response referencing the destination location and metadata.
+
+## Quick start (overview)
+Prerequisites:
+- Python 3.8+ (or the language/runtime used by this project)
+- Access to AWS and/or GCP with appropriate service account credentials.
+- Redis instance for caching (optional but recommended).
+- fastmcp installed (this project is built on top of fastmcp).
+
+Basic steps:
+1. Clone this repo:
+   git clone https://github.com/stancsz/data-mcp-server.git
+2. Configure credentials (see next section).
+3. Configure service accounts, policies, and connector settings.
+4. Start the MCP server (example):
+   - The exact command depends on the project layout (e.g., `python -m data_mcp.server` or `uvicorn data_mcp.app:app --reload`). Check the `./bin` or `./scripts` folder or the project’s main module.
+5. Connect an agent using fastmcp protocol and authenticate with an SA credential.
+
+Note: This README provides the conceptual setup. See the configuration examples below and the repo's config files for concrete examples.
+
+## Configuration examples
+
+Environment variables (common):
+- AWS:
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_SESSION_TOKEN (optional)
+  - AWS_REGION
+- GCP:
+  - GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+- Redis:
+  - REDIS_URL=redis://:password@host:6379/0
+- MCP:
+  - MCP_PORT=your_port
+  - MCP_HOST=0.0.0.0
+
+Sample config (YAML) - connectors and policies (example snippet):
+```yaml
+connectors:
+  s3:
+    enabled: true
+    default_bucket: my-tenant-bucket
+  bigquery:
+    enabled: true
+    project: my-gcp-project
+  redshift:
+    enabled: true
+  dynamodb:
+    enabled: true
+  gcs:
+    enabled: true
+
+auth:
+  service_accounts:
+    - id: sa-data-analyst
+      allowed_roles: [read-only]
+      attributes:
+        department: analytics
+
+cache:
+  redis_url: redis://localhost:6379/0
+  ttl_seconds: 3600
+
+pipeline:
+  default_processors:
+    - normalize
+    - deduplicate
+    - aggregate
 ```
 
-(If dependencies are required, add them to a `requirements.txt` and install with `pip install -r requirements.txt`.)
+Service account onboarding:
+- Upload or register SA credential(s) with the MCP server (secure secret store).
+- Assign roles and attribute mappings to the SA.
+- Define per-SA or per-role policies controlling:
+  - which connectors may be used
+  - which buckets/tables/datasets are accessible
+  - whether delivery to external sinks is allowed
 
-## Prompt Flow Overview
+## Usage patterns & examples
+- Data probe:
+  - Agent requests a probe; MCP returns either cached result or initiates a fetch & process.
+- Cross-source join:
+  - Pull data from S3 (daily files) and BigQuery (reference table), join in-memory, and write output to GCS.
+- Export pipeline:
+  - Agent triggers a pipeline that extracts data from Redshift, transforms it, and writes CSVs to S3 for downstream systems.
 
-```mermaid
-flowchart TD
-    A["User Instruction"] --> B["Agent: Planning Phase"]
-    B --> C["LLM: Generate Step-by-Step Plan"]
-    C --> D["Agent: Execution Phase"]
-    D --> E["LLM: Edit Code File(s)"]
-    E --> F["Write Changes to Files"]
-    F --> G{"Task Complete?"}
-    G -- Yes --> H["Done"]
-    G -- No (Max Loops) --> I["Agent: Reflection Log"]
-    I --> J["Self-Learning API"]
-    J --> K["Agent: Self-Edit Source Code"]
-    K --> F
-```
-
-- The agent receives a user instruction and plans the steps with the LLM.
-- It executes the plan, asking the LLM to edit code.
-- If the task is not completed after several loops, it generates a reflection log.
-- The reflection log is sent to the self-learning API, which can trigger the agent to self-edit its own codebase, closing the feedback loop.
-
-## Self-Evolving Mechanism
-
-```mermaid
-flowchart TD
-    A[Agent Hits Max Loops or Fails Task] --> B[Generate Reflection Log]
-    B --> C[Send Log to Self-Learning API]
-    C --> D[Agent Analyzes Log & Codebase]
-    D --> E[LLM Proposes Self-Edits]
-    E --> F[Apply Edits to Agent Source Code]
-    F --> G[Commit & Push Changes]
-    G --> H[Agent Ready for New Tasks]
-```
-
-- When the agent cannot complete a task, it generates a reflection log.
-- The log is sent to the self-learning API endpoint.
-- The agent uses the LLM to analyze the log and its own codebase, proposing and applying self-improvements.
-- Changes are committed and pushed to version control.
-- The improved agent is ready to handle new tasks, enabling continuous self-evolution.
-
-## Usage
-
-See `example.py` for a basic usage example.
-
-```python
-from coding_agent.agent import Agent
-
-agent = Agent()
-# Use the agent as needed
-```
-
-Or run the agent to refactor a project:
-
-```python
-from coding_agent import run_coding_agent
-
-run_coding_agent(
-    prompt="Refactor all functions to use async/await.",
-    code_dir="./my_project",
-    pr_title="Refactor to async/await",
-    pr_body="This PR refactors all functions to use async/await syntax.",
-    pr_branch="refactor-async-await",
-    commit_and_push=True
-)
-```
-
-You may need to configure environment variables. See `.env.example` for reference.
-
-## Self-Learning API
-
-Start the self-learning API server:
-
-```bash
-python self_learning_api.py
-```
-
-The agent will POST reflection logs and self-edit diffs to the `/self-learning` endpoint, which will apply, commit, and push code changes.
-
-## Playwright MCP Setup
-
-This project supports browser automation and web testing via the [Playwright MCP](https://github.com/microsoft/playwright-mcp) server.
-
-### Requirements
-
-- Node.js 18 or newer
-
-### Configuration
-
-The Playwright MCP server is already configured in `.vscode/settings.json`:
-
+Example (pseudocode) request payload
 ```json
 {
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": [
-        "@playwright/mcp@latest"
-      ]
-    }
-  }
+  "action": "run_probe",
+  "auth": {
+    "service_account": "base64-or-path-or-token"
+  },
+  "sources": [
+    { "type": "s3", "bucket": "tenant-bucket", "path": "2025/09/15/*.parquet", "format": "parquet" },
+    { "type": "bigquery", "project": "my-project", "query": "SELECT * FROM dataset.table WHERE date = '2025-09-15'" }
+  ],
+  "processors": [
+    { "name": "filter", "params": { "column": "status", "value": "active" } },
+    { "name": "aggregate", "params": { "group_by": ["country"], "metrics": ["sum(amount)"] } }
+  ],
+  "destination": { "type": "gcs", "bucket": "results-bucket", "path": "agent-outputs/2025-09-15/" }
 }
 ```
 
-If you use VS Code, Cursor, Windsurf, or Claude Desktop, this configuration will automatically launch the Playwright MCP server for you.
+## Development notes
+- Connector adapters are modular. To add a new connector:
+  - Implement a connector class with the standard fetch/query/write interface.
+  - Register the connector in the server's connector registry.
+- Processor hooks:
+  - Processors are stateless functions that accept input data, parameters, and return transformed data.
+- Caching:
+  - Cache keys should consider source signature, query text, credentials identity, processors list, and any relevant parameters.
+- Auditing:
+  - All actions must include metadata (agent id, SA id, timestamp, target resources) and be logged to a secure append-only store (or exported to your SIEM).
 
-### Usage
-
-Once the server is running, the agent can access Playwright MCP tools for browser automation and testing.
-
-To verify your setup, run:
-
-```bash
-pytest tests/test_playwright_mcp.py
-```
-
-This will run a test that uses Playwright MCP to automate a browser and check the result.
-
--------
-
-## Testing
-
-Run the tests using:
-
-```bash
-python -m unittest discover tests
-```
-
-### Dummy Project for Testing
-
-A folder named `tests/dummy project/` is included in this repository. This dummy project is used exclusively for testing purposes. Unit tests may reference this folder, and it should not be considered part of the main application logic.
-
-## Project Structure
-
-```
-coding_agent/
-    __init__.py
-    agent.py
-    mcp.py
-    utils.py
-example.py
-self_learning_api.py
-tests/
-    test_agent.py
-.env.example
-```
+## Testing & CI
+- Unit tests should mock cloud connectors and Redis.
+- Integration tests can be run against localstack (for AWS) and the BigQuery emulator (or a test GCP project).
+- CI should validate policy enforcement scenarios (RBAC/ABAC) to ensure no privilege escalation paths.
 
 ## Contributing
+- Fork the repo and submit PRs for bug fixes, new connectors, or processor modules.
+- Ensure tests accompany new features.
+- Follow semantic commit messages and include CHANGELOG entries for user-facing changes.
 
-Contributions are welcome! Please open issues or submit pull requests for improvements or bug fixes.
+## Security considerations
+- Do not store SA credentials in source control.
+- Use a secure secrets manager for stored credentials (e.g., AWS Secrets Manager, GCP Secret Manager, Vault).
+- Ensure encrypted transit (TLS) for all MCP and connector communications.
+- Apply the least privilege principle for any transient credentials issued or relayed by the MCP server.
 
-## License
+## Roadmap / future ideas
+- Add fine-grained data masking and field-level access control.
+- Introduce connectors for additional cloud and on-prem data warehouses.
+- Add an audit UI for compliance teams to review agent activity and data flows.
+- Implement policy templates for common enterprise compliance regimes (SOC2, HIPAA, GDPR).
 
-[MIT License](LICENSE)
+## Contact & support
+- Repo: https://github.com/stancsz/data-mcp-server
+- Issues: please open GitHub issues for bugs or feature requests.
+- For enterprise integrations, include contact details or internal support channels here.
+
+---
+This README is intended to be a guiding blueprint. Update the repository's configuration, examples, and run instructions to match the actual code layout and run scripts used in this project.
