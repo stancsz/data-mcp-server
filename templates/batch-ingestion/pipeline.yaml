@@ -1,0 +1,28 @@
+name: example-batch-ingest
+source:
+  # type: "local" or "s3"
+  type: local
+  # for local use provide a local_path
+  local_path: ./data/input.csv
+  # for s3 use:
+  # type: s3
+  # s3_bucket: my-bucket
+  # s3_key: path/to/input.csv
+
+transform:
+  csv:
+    delimiter: ","
+
+destination:
+  # type: "local" or "s3"
+  type: local
+  # local target directory (will write <filename>.parquet or .csv.gz)
+  local_path: ./out/
+  # for s3 use:
+  # type: s3
+  # s3_bucket: my-output-bucket
+  # s3_key_prefix: processed/
+
+options:
+  overwrite: false
+  max_retries: 3
