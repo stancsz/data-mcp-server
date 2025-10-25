@@ -1,0 +1,125 @@
+name: Integration - Batch Ingestion (manual, gated)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  run-batch-integration:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install AWS CLI & deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 pandas pyarrow pyyaml awscli
+
+      - name: Prepare variables
+        env:
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          echo "region=${AWS_REGION}" > .env
+          echo "Prepared AWS_REGION: ${AWS_REGION}"
+
+      - name: Create temporary S3 bucket (script)
+        env:
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          set -e
+          # ensure scripts are executable
+          chmod +x infra/ci/create_ci_resources.sh || true
+          # create bucket using infra script; script prints bucket name to stdout
+          BUCKET=$(bash infra/ci/create_ci_resources.sh data-mcp-server-integration)
+          echo "BUCKET=${BUCKET}" >> $GITHUB_ENV
+          echo "Created bucket: ${BUCKET}"
+          echo "BUCKET=${BUCKET}" >> .env
+
+      - name: Upload sample CSV to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          set -e
+          echo "id,name,amount" > sample.csv
+          echo "1,Alice,10" >> sample.csv
+          echo "2,Bob,15" >> sample.csv
+          aws s3 cp sample.csv "s3://$BUCKET/input/sample.csv"
+          aws s3 ls "s3://$BUCKET/input/"
+
+      - name: Prepare pipeline config for CI
+        run: |
+          cat > ci-pipeline.yaml <<'YAML'
+name: ci-batch
+source:
+  type: s3
+  s3_bucket: ${BUCKET}
+  s3_key: input/sample.csv
+transform:
+  csv:
+    delimiter: ","
+destination:
+  type: s3
+  s3_bucket: ${BUCKET}
+  s3_key_prefix: output/
+options:
+  overwrite: true
+  max_retries: 2
+YAML
+          echo "Wrote ci-pipeline.yaml"
+
+      - name: Run batch runner
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          set -e
+          python templates/batch-ingestion/runner.py --config ci-pipeline.yaml
+
+      - name: Validate output exists
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          set -e
+          echo "Listing output prefix in bucket..."
+          aws s3 ls "s3://$BUCKET/output/" || (echo "No output objects found" && exit 1)
+          # ensure at least one object exists
+          COUNT=$(aws s3 ls "s3://$BUCKET/output/" | wc -l)
+          if [ "$COUNT" -lt 1 ]; then
+            echo "Expected >=1 output objects, found $COUNT"
+            exit 1
+          fi
+          echo "Found $COUNT output objects"
+
+      - name: Teardown bucket (always attempt)
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          set -e
+          # ensure destroy script is executable
+          chmod +x infra/ci/destroy_ci_resources.sh || true
+          echo "Destroying bucket: $BUCKET"
+          bash infra/ci/destroy_ci_resources.sh "$BUCKET" "${AWS_REGION}" || {
+            echo "Destroy script reported failure; attempting best-effort cleanup via aws cli"
+            aws s3 rm "s3://$BUCKET" --recursive || echo "Failed to remove objects"
+            aws s3api delete-bucket --bucket "$BUCKET" --region "${AWS_REGION}" || echo "Failed to delete bucket"
+          }
